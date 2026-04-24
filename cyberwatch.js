@@ -1,6 +1,7 @@
 const appState = {
     activeView: "dashboard",
     logFilter: "all",
+    isSidebarCollapsed: false,
     logs: [
         { userId: "USR001", username: "alice_admin", loginTime: "2026-04-20 07:12:04", status: "Success", ip: "192.168.1.101" },
         { userId: "USR002", username: "bob_smith", loginTime: "2026-04-20 07:15:33", status: "Failure", ip: "10.0.0.45" },
@@ -13,38 +14,74 @@ const appState = {
     ],
     alerts: [
         {
-            level: "LOW",
+            level: "HIGH",
             username: "bob_smith",
             userId: "USR002",
-            message: "3 consecutive failed login attempts detected",
+            message: "7 consecutive failed login attempts detected",
             ip: "10.0.0.45",
             time: "4/20/2026, 9:52:45 PM",
-            attempts: "3 failed attempts"
+            attempts: "7 failed attempts"
+        },
+        {
+            level: "HIGH",
+            username: "eve_analyst",
+            userId: "USR005",
+            message: "10 consecutive failed login attempts detected",
+            ip: "203.0.113.55",
+            time: "4/20/2026, 9:52:45 PM",
+            attempts: "10 failed attempts"
+        },
+        {
+            level: "HIGH",
+            username: "hank_finance",
+            userId: "USR008",
+            message: "16 consecutive failed login attempts detected",
+            ip: "198.51.100.2",
+            time: "4/20/2026, 9:52:45 PM",
+            attempts: "16 failed attempts"
+        },
+        {
+            level: "HIGH",
+            username: "leo_qa",
+            userId: "USR012",
+            message: "20 consecutive failed login attempts detected",
+            ip: "203.0.113.77",
+            time: "4/20/2026, 9:52:45 PM",
+            attempts: "20 failed attempts"
         },
         {
             level: "MEDIUM",
-            username: "eve_analyst",
-            userId: "USR005",
+            username: "maya_ops",
+            userId: "USR014",
             message: "4 consecutive failed login attempts detected",
-            ip: "203.0.113.55",
+            ip: "198.51.100.22",
             time: "4/20/2026, 9:52:45 PM",
             attempts: "4 failed attempts"
         },
         {
             level: "LOW",
-            username: "hank_finance",
-            userId: "USR008",
+            username: "oliver_it",
+            userId: "USR017",
             message: "3 consecutive failed login attempts detected",
-            ip: "198.51.100.2",
+            ip: "10.10.10.17",
             time: "4/20/2026, 9:52:45 PM",
             attempts: "3 failed attempts"
         },
         {
             level: "LOW",
-            username: "leo_qa",
-            userId: "USR012",
+            username: "ruth_admin",
+            userId: "USR018",
             message: "3 consecutive failed login attempts detected",
-            ip: "203.0.113.77",
+            ip: "10.10.10.18",
+            time: "4/20/2026, 9:52:45 PM",
+            attempts: "3 failed attempts"
+        },
+        {
+            level: "LOW",
+            username: "sam_guest",
+            userId: "USR019",
+            message: "3 consecutive failed login attempts detected",
+            ip: "10.10.10.19",
             time: "4/20/2026, 9:52:45 PM",
             attempts: "3 failed attempts"
         }
@@ -55,6 +92,8 @@ const elements = {
     loginScreen: document.getElementById("loginScreen"),
     appShell: document.getElementById("appShell"),
     loginForm: document.getElementById("loginForm"),
+    shellGrid: document.getElementById("shellGrid"),
+    sidebarToggle: document.getElementById("sidebarToggle"),
     navItems: Array.from(document.querySelectorAll(".nav-item[data-view]")),
     routeButtons: Array.from(document.querySelectorAll("[data-view-target]")),
     views: Array.from(document.querySelectorAll(".view")),
@@ -85,6 +124,10 @@ function statCards() {
         { label: "Successful login", value: successes, tone: "tone-green" },
         { label: "Suspicious activities", value: appState.alerts.length ? 0 : 0, tone: "tone-gold" }
     ];
+}
+
+function highAlerts() {
+    return appState.alerts.filter(alert => alert.level === "HIGH");
 }
 
 function reportCards() {
@@ -156,8 +199,9 @@ function renderLogs() {
 
 function renderAlerts() {
     renderStatGrid(elements.severityStats, severityCards());
-    elements.alertsList.innerHTML = appState.alerts.map(alert => `
-        <article class="alert-card">
+    const urgentAlerts = highAlerts();
+    elements.alertsList.innerHTML = urgentAlerts.map(alert => `
+        <article class="alert-card high-alert">
             <div class="alert-top">
                 <span class="alert-level severity-${alert.level.toLowerCase()}">${alert.level}</span>
                 <span class="alert-user">${alert.username}</span>
@@ -171,6 +215,14 @@ function renderAlerts() {
             </div>
         </article>
     `).join("");
+
+    if (!urgentAlerts.length) {
+        elements.alertsList.innerHTML = `
+            <article class="alert-card">
+                <p class="alert-message">No high severity alerts are currently active.</p>
+            </article>
+        `;
+    }
 }
 
 function renderReports() {
@@ -186,6 +238,41 @@ function navigateTo(view) {
     elements.views.forEach(section => {
         section.classList.toggle("active", section.id === `view-${view}`);
     });
+}
+
+function syncSidebarState() {
+    elements.shellGrid.classList.toggle("sidebar-collapsed", appState.isSidebarCollapsed);
+    elements.sidebarToggle.setAttribute("aria-expanded", String(!appState.isSidebarCollapsed));
+    elements.sidebarToggle.setAttribute(
+        "aria-label",
+        appState.isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+    );
+}
+
+function exportReportsCsv() {
+    const header = ["User ID", "Username", "Login time", "Status", "IP Address", "Risk Level"];
+    const rows = appState.logs.map(row => [
+        row.userId,
+        row.username,
+        row.loginTime,
+        row.status,
+        row.ip,
+        row.status === "Success" ? "LOW" : "HIGH"
+    ]);
+
+    const csvLines = [header, ...rows].map(columns =>
+        columns.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+    );
+
+    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "cyberwatch-reports.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
 }
 
 function createToast(title, message, isError = false) {
@@ -215,6 +302,11 @@ function attachEvents() {
         button.addEventListener("click", () => navigateTo(button.dataset.viewTarget));
     });
 
+    elements.sidebarToggle.addEventListener("click", () => {
+        appState.isSidebarCollapsed = !appState.isSidebarCollapsed;
+        syncSidebarState();
+    });
+
     elements.logsSearch.addEventListener("input", renderLogs);
 
     elements.filterButtons.forEach(button => {
@@ -240,15 +332,16 @@ function attachEvents() {
     });
 
     elements.clearAlertsBtn.addEventListener("click", () => {
-        appState.alerts = [];
+        appState.alerts = appState.alerts.filter(alert => alert.level !== "HIGH");
         renderAlerts();
         renderReports();
         renderDashboard();
-        createToast("Alerts cleared", "All suspicious activity cards were dismissed.");
+        createToast("Alerts cleared", "High severity alerts were dismissed until the page reloads.");
     });
 
     elements.exportBtn.addEventListener("click", () => {
-        createToast("Export started", "Security report is being prepared.");
+        exportReportsCsv();
+        createToast("Export complete", "The reports CSV was downloaded.");
     });
 
     elements.logoutBtn.addEventListener("click", () => {
@@ -264,6 +357,7 @@ function initialize() {
     renderLogs();
     renderAlerts();
     renderReports();
+    syncSidebarState();
     attachEvents();
 }
 
